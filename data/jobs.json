@@ -1,1 +1,8 @@
-{"updated_at":null,"discovered_this_run":0,"queries_attempted":0,"errors":[],"jobs":[],"notice":"최초 자동 수집 전입니다."}
+{
+  "updated_at": "2026-11-05T02:55:28+00:00",
+  "discovered_this_run": 0,
+  "queries_attempted": 10,
+  "errors": [],
+  "jobs": [],
+  "notice": "검색 엔진 색인 기반 후보 공고입니다. 실제 채용 진행 여부, 마감일, 경력 인정은 반드시 원문에서 확인하세요."
+}
