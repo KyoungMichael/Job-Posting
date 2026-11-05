@@ -1,26 +1,8 @@
 {
-  "updated_at": "2026-11-05T03:36:35+00:00",
-  "discovered_this_run": 1,
-  "queries_attempted": 10,
+  "updated_at": "2026-11-05T03:43:17+00:00",
+  "discovered_this_run": 0,
+  "queries_attempted": 26,
   "errors": [],
-  "jobs": [
-    {
-      "url": "https://tobeprocessengineer.com/hazop",
-      "title": "The Ultimate Guide to HAZOP, LOPA, and FMEA for Engineers",
-      "description": "HAZOP (Hazards and Operability Study) is a structured and systematic examination of a complex planned or existing process. It is arguably the most essential qualitative risk assessment technique in the process industry today. Unlike general brainstorming, HAZOP is rigorous.",
-      "category": "공정안전",
-      "source": "tobeprocessengineer.com",
-      "fit": "중",
-      "matched_skills": [
-        "hazop",
-        "lopa"
-      ],
-      "first_seen": "2026-11-05T03:36:35+00:00",
-      "last_seen": "2026-11-05T03:36:35+00:00",
-      "changed_at": null,
-      "status": "검색 발견 · 모집 여부 원문 확인 필요",
-      "seen_in_latest_run": true
-    }
-  ],
-  "notice": "검색 엔진 색인 기반 후보 공고입니다. 실제 채용 진행 여부, 마감일, 경력 인정은 반드시 원문에서 확인하세요."
+  "jobs": [],
+  "notice": "한국 근무지와 정유·화학/CCUS/공정안전 경험 연관성을 검색한 후보입니다. 금융·컨설팅 포함. 실제 국내 근무 여부, 모집 중 여부, 마감일 및 우대조건은 원문 확인이 필요합니다."
 }
