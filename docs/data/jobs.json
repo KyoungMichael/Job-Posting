@@ -1,8 +1,92 @@
 {
-  "updated_at": "2026-11-05T03:43:17+00:00",
-  "discovered_this_run": 0,
-  "queries_attempted": 26,
+  "updated_at": "2026-11-05T03:53:56+00:00",
+  "discovered_this_run": 1,
+  "queries_attempted": 100,
   "errors": [],
-  "jobs": [],
-  "notice": "한국 근무지와 정유·화학/CCUS/공정안전 경험 연관성을 검색한 후보입니다. 금융·컨설팅 포함. 실제 국내 근무 여부, 모집 중 여부, 마감일 및 우대조건은 원문 확인이 필요합니다."
+  "diagnostics": {
+    "queries": 100,
+    "rss_results": 915,
+    "rejected": {
+      "직무 연관성 없음": 769,
+      "채용 단서 없음": 124,
+      "자료/비공고": 20
+    },
+    "accepted": 1,
+    "sources": {
+      "전체 웹": {
+        "queries": 18,
+        "results": 168,
+        "accepted": 1
+      },
+      "과거 공고": {
+        "queries": 18,
+        "results": 172,
+        "accepted": 0
+      },
+      "사람인": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      },
+      "자소설닷컴": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      },
+      "LinkedIn": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      },
+      "리멤버": {
+        "queries": 8,
+        "results": 71,
+        "accepted": 0
+      },
+      "한국벤처캐피탈협회": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      },
+      "금융투자협회": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      },
+      "잡코리아": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      },
+      "원티드": {
+        "queries": 8,
+        "results": 72,
+        "accepted": 0
+      }
+    }
+  },
+  "jobs": [
+    {
+      "url": "https://www.ogci.com/ccus",
+      "title": "Carbon capture, utilization and storage (CCUS) - OGCI",
+      "description": "Carbon capture, utilization and storage (CCUS) is a crucial enabler for the energy transition. It helps industrial companies – and entire regions – decarbonize, while maintaining and creating jobs.",
+      "category": "금융·컨설팅",
+      "source": "www.ogci.com",
+      "discovered_via": "전체 웹",
+      "fit": "상",
+      "matched_skills": [
+        "ccus",
+        "carbon capture",
+        "energy"
+      ],
+      "first_seen": "2026-11-05T03:53:56+00:00",
+      "last_seen": "2026-11-05T03:53:56+00:00",
+      "seen_in_latest_run": true,
+      "location_check": "근무지 미확인",
+      "posting_date_hint": null,
+      "status": "모집 여부 확인 필요",
+      "historical": true
+    }
+  ],
+  "notice": "공개 검색 결과 기반 채용 후보 목록. 2026년 과거 공고 포함. 마감 여부·근무지·우대사항은 원문 검증 전까지 미확인입니다."
 }
