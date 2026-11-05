@@ -1,415 +1,394 @@
 
-import json
-import re
-import time
-from datetime import datetime, timezone, timedelta
+"""Public search-index candidate collector. No login, bypass or guaranteed completeness."""
+import json, re, time, html
+from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote, urlparse, parse_qs, urlencode, urlunparse
-
+from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 import requests
 from bs4 import BeautifulSoup
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "data" / "jobs.json"
+OUT = ROOT / 'data' / 'jobs.json'
+YEAR = 2026
 
-# 기존 대시보드의 세 가지 카테고리 유지
-QUERIES = {
-    "정유·화학": [
-        "정유 석유화학 공정기술 채용 한국",
-        "화학 생산기술 공정엔지니어 경력 채용 국내",
-        "정유 석유화학 신사업개발 채용",
-        "에너지 화학 산업 경력 우대 채용 사업개발",
-        "site:jobkorea.co.kr 정유 화학 경력 우대 채용",
-        "site:saramin.co.kr 석유화학 공정 경력 채용",
-        "site:linkedin.com/jobs Korea refinery petrochemical process engineer",
-        "에너지 화학 산업 리서치 애널리스트 채용",
-        "에너지 석유화학 프로젝트 파이낸싱 투자심사 채용",
-        "정유 화학 산업 전략 컨설턴트 채용",
-        "energy chemicals strategy consulting Seoul careers",
-    ],
-    "탄소포집": [
-        "CCS CCUS 탄소포집 채용 대한민국",
-        "탄소포집 CCUS 경험 우대 채용",
-        "CCUS 사업개발 프로젝트 엔지니어 채용",
-        "탄소포집 수소 저탄소 기술 사업개발 채용",
-        "CCUS 탄소중립 투자 금융 채용",
-        "탄소포집 탈탄소 컨설팅 채용",
-        "site:linkedin.com/jobs Korea carbon capture CCUS",
-        "site:jobkorea.co.kr CCUS CCS 채용",
-        "carbon capture CCS consulting Seoul hiring",
-    ],
-    "공정안전": [
-        "공정안전 PSM HAZOP 경력 채용 국내",
-        "LOPA HAZOP 공정안전 우대 채용",
-        "Process Safety Engineer Korea hiring",
-        "공정안전 위험성평가 기술실사 컨설팅 채용",
-        "site:saramin.co.kr PSM HAZOP 채용",
-        "site:jobkorea.co.kr 공정안전 경력 채용",
-    ],
+SITES = {
+    '사람인': 'saramin.co.kr',
+    '자소설닷컴': 'jasoseol.com',
+    'LinkedIn': 'linkedin.com/jobs',
+    '리멤버': 'career.rememberapp.co.kr',
+    '한국벤처캐피탈협회': 'kvca.or.kr',
+    '금융투자협회': 'kofia.or.kr',
+    '잡코리아': 'jobkorea.co.kr',
+    '원티드': 'wanted.co.kr'
 }
 
-KEYWORDS = {
-    "정유·화학": [
-        "정유", "석유화학", "화학", "공정기술",
-        "생산기술", "process engineer", "refinery",
-        "petrochemical", "energy", "chemicals",
+CATEGORIES = {
+    '정유·화학': [
+        '정유 공정기술',
+        '석유화학 생산기술',
+        '화학 공정엔지니어',
+        '정유 화학 경력 우대',
+        'energy chemicals 사업개발'
     ],
-    "탄소포집": [
-        "ccs", "ccus", "탄소포집", "탄소저감",
-        "수소", "carbon capture", "decarbonization",
+    '탄소포집': [
+        'CCS CCUS',
+        '탄소포집 사업개발',
+        'carbon capture Korea',
+        '수소 저탄소 사업'
     ],
-    "공정안전": [
-        "공정안전", "psm", "hazop", "lopa",
-        "process safety", "위험성평가",
+    '공정안전': [
+        '공정안전 PSM',
+        'HAZOP LOPA',
+        'process safety Korea',
+        '위험성평가 공정'
     ],
+    '금융·컨설팅': [
+        '정유 화학 투자심사',
+        '에너지 산업 리서치',
+        'CCUS 투자',
+        '에너지 전략 컨설팅',
+        '에너지 기술실사'
+    ]
 }
 
-SKILLS = [
-    "ccs", "ccus", "탄소포집", "수소",
-    "hazop", "lopa", "psm", "공정안전",
-    "공정기술", "생산기술", "moc",
-    "process safety", "process engineer",
-    "석유화학", "정유",
-]
+CORE = (
+    '정유', '석유화학', '화학', '공정', '탄소포집',
+    'ccus', 'ccs', 'carbon capture', 'hazop',
+    'lopa', 'psm', 'process safety', '수소',
+    'energy', '에너지', '탈탄소', '저탄소'
+)
 
-JOB_TERMS = [
-    "채용", "모집", "입사지원", "recruitment",
-    "recruiting", "hiring", "job opening",
-    "job posting", "apply now", "careers",
-    "career opportunity", "경력직",
-    "우대사항", "자격요건",
-]
+FIN = (
+    '투자', '금융', '컨설팅', 'consult',
+    'investment', '리서치', '심사역',
+    'pf', 'due diligence', '애널리스트'
+)
 
-BAD_TERMS = [
-    "ultimate guide", "what is", "how to",
-    "tutorial", "교육과정", "교육안내",
-    "강의", "자격증", "합격자소서",
-    "면접후기", "연봉정보", "뉴스",
-    "블로그", "가이드", "위키", "논문",
-    "보고서", "세미나", "웨비나",
-    "기술자료", "백서",
-]
+JOB = (
+    '채용', '모집', '경력', '신입', '공고',
+    'recruit', 'hiring', 'job', 'career',
+    'position', 'apply', 'employment', '인재'
+)
 
-BAD_HOSTS = [
-    "youtube.com", "wikipedia.org",
-    "namu.wiki", "tobeprocessengineer.com",
-    "medium.com", "tistory.com",
-    "blog.naver.com", "news.naver.com",
-]
+NEG = (
+    'ultimate guide', 'what is', 'tutorial',
+    '교육과정', '세미나', '블로그', '뉴스',
+    '논문', '가이드', '강의', '교재',
+    '위키', '면접후기', '합격자소서'
+)
 
-JOB_HOST_HINTS = [
-    "jobkorea.co.kr", "saramin.co.kr",
-    "wanted.co.kr", "linkedin.com/jobs",
-    "indeed.com", "incruit.com",
-    "recruit", "career", "jobs",
-    "greenhouse.io", "lever.co",
-    "workdayjobs.com",
-]
+KOREA = (
+    '한국', '대한민국', '서울', '경기', '인천',
+    '대전', '울산', '부산', '여수', '포항',
+    '대산', '판교', '수원', '충북', '충남',
+    '경북', '경남', '전남', '전북', '광주',
+    '대구', '세종', 'seoul', 'korea',
+    'ulsan', 'busan', 'incheon'
+)
 
-KOREA_TERMS = [
-    "대한민국", "한국", "국내", "서울",
-    "경기", "인천", "대전", "세종",
-    "충북", "충남", "전북", "전남",
-    "경북", "경남", "부산", "울산",
-    "대구", "광주", "포항", "여수",
-    "대산", "온산", "평택", "판교",
-    "송도", "seoul", "south korea",
-    "republic of korea", "korea",
-    "ulsan", "busan", "incheon",
-    "pohang", "yeosu",
-]
-
-FOREIGN_ONLY = [
-    "united states", "united kingdom",
-    "canada", "singapore", "australia",
-    "dubai", "remote - us",
-    "미국 근무", "캐나다 근무", "싱가포르 근무",
-]
-
-FINANCE = [
-    "금융", "투자", "증권", "자산운용",
-    "pf", "project finance", "investment",
-    "equity research", "애널리스트",
-    "리서치", "인프라펀드",
-]
-
-CONSULTING = [
-    "컨설팅", "컨설턴트", "consulting",
-    "consultant", "advisory",
-    "실사", "due diligence",
-]
+SESSION = requests.Session()
+SESSION.headers.update({
+    'User-Agent': (
+        'Mozilla/5.0 '
+        '(compatible; JobsDashboard/2.0; public search results)'
+    )
+})
 
 
-def canonical(url):
-    p = urlparse(url)
-
-    if p.scheme not in ("http", "https") or not p.netloc:
-        return ""
-
-    if p.netloc.lower().endswith("bing.com") and p.path.startswith("/ck/"):
-        return ""
+def clean_url(u):
+    p = urlparse(u)
+    if p.scheme not in ('http', 'https') or not p.netloc:
+        return ''
 
     q = [
         (k, v)
-        for k, vs in parse_qs(p.query).items()
-        for v in vs
-        if not k.lower().startswith(("utm_", "fbclid", "gclid"))
+        for k, v in parse_qsl(p.query)
+        if not k.lower().startswith(('utm_', 'fbclid', 'gclid'))
     ]
 
     return urlunparse((
-        p.scheme,
-        p.netloc.lower(),
-        p.path.rstrip("/"),
-        "",
-        urlencode(q),
-        "",
+        p.scheme, p.netloc.lower(),
+        p.path.rstrip('/'), '',
+        urlencode(q), ''
     ))
 
 
-def search(query):
-    url = "https://www.bing.com/search?format=rss&q=" + quote(query)
-
-    r = requests.get(
-        url,
-        timeout=20,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; PublicJobsMonitor/3.0)"
-        },
+def rss(query):
+    r = SESSION.get(
+        'https://www.bing.com/search',
+        params={'format': 'rss', 'q': query},
+        timeout=22
     )
-
     r.raise_for_status()
 
-    soup = BeautifulSoup(r.content, "xml")
+    soup = BeautifulSoup(r.content, 'xml')
+    if soup.find('rss') is None:
+        raise ValueError('RSS 응답 형식 아님')
 
-    if soup.find("rss") is None:
-        raise ValueError("RSS 응답이 아닙니다")
+    items = []
 
-    for item in soup.find_all("item"):
-        title = item.find("title")
-        link = item.find("link")
-        desc = item.find("description")
+    for item in soup.select('item'):
+        def get(tag):
+            el = item.find(tag)
+            return el.get_text(' ', strip=True) if el else ''
 
-        if title and link:
-            description = BeautifulSoup(
-                desc.get_text(" ", strip=True) if desc else "",
-                "html.parser",
-            ).get_text(" ", strip=True)
+        items.append((
+            get('title'),
+            clean_url(get('link')),
+            BeautifulSoup(
+                html.unescape(get('description')),
+                'html.parser'
+            ).get_text(' ', strip=True)
+        ))
 
-            yield (
-                title.get_text(" ", strip=True),
-                canonical(link.get_text(" ", strip=True)),
-                description,
-            )
+    return items
 
 
-def relevant(title, desc, url, category):
+def accept(title, desc, url, category):
+    text = (title + ' ' + desc).lower()
     t = title.lower()
-    d = desc.lower()
-    combined = t + " " + d
+    path = (
+        urlparse(url).netloc + urlparse(url).path
+    ).lower()
 
-    hostpath = (urlparse(url).netloc + urlparse(url).path).lower()
+    if not url or any(x in t for x in NEG):
+        return False, '자료/비공고'
 
-    if any(x in hostpath for x in BAD_HOSTS):
-        return False
-
-    if any(x in t for x in BAD_TERMS):
-        return False
-
-    if not any(x in combined for x in KEYWORDS[category]):
-        return False
-
-    if not any(x in combined for x in JOB_TERMS):
-        return False
+    if not any(x in text for x in CORE):
+        if not (
+            category == '금융·컨설팅'
+            and any(x in text for x in FIN)
+        ):
+            return False, '직무 연관성 없음'
 
     if not (
-        any(x in t for x in JOB_TERMS)
-        or any(x in hostpath for x in JOB_HOST_HINTS)
+        any(x in text for x in JOB)
+        or any(
+            x in path
+            for x in (
+                '/jobs', '/job', '/recruit',
+                '/career', '/position', '/recruitment'
+            )
+        )
     ):
-        return False
+        return False, '채용 단서 없음'
 
-    if (
-        any(x in combined for x in FOREIGN_ONLY)
-        and not any(x in combined for x in KOREA_TERMS)
-    ):
-        return False
-
-    return True
+    return True, '후보'
 
 
-def location_status(title, desc):
-    combined = (title + " " + desc).lower()
+def classify_date(title, desc):
+    text = title + ' ' + desc
 
-    if any(x in combined for x in KOREA_TERMS):
-        return "국내 근무지 추정 · 원문 확인 필요"
+    m = re.search(
+        r'(?<!\d)(2026)[.\-/]\s*'
+        r'(0?[1-9]|1[0-2])[.\-/]\s*'
+        r'(0?[1-9]|[12]\d|3[01])(?!\d)',
+        text
+    )
 
-    return "근무지 미확인 · 국내 여부 확인 필요"
+    if m:
+        return (
+            f'{int(m[1]):04d}-'
+            f'{int(m[2]):02d}-'
+            f'{int(m[3]):02d}'
+        )
 
-
-def sector(title, desc):
-    s = (title + " " + desc).lower()
-
-    if any(x in s for x in FINANCE):
-        return "금융·투자"
-
-    if any(x in s for x in CONSULTING):
-        return "컨설팅"
-
-    return "산업·기술"
-
-
-def fit(text):
-    hits = [x for x in SKILLS if x in text.lower()]
-
-    if len(hits) >= 3:
-        score = "상"
-    elif hits:
-        score = "중"
-    else:
-        score = "하"
-
-    return score, hits
+    return None
 
 
-def run():
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+def main():
+    now = datetime.now(
+        timezone.utc
+    ).isoformat(timespec='seconds')
 
     try:
-        old = json.loads(DATA.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        old = {"jobs": []}
+        old = json.loads(
+            OUT.read_text(encoding='utf-8')
+        )
+    except (ValueError, OSError):
+        old = {}
 
-    jobs = {}
+    archive = {
+        j['url']: j
+        for j in old.get('jobs', [])
+        if isinstance(j, dict) and j.get('url')
+    }
 
-    # 기존 데이터 중 오분류된 항목 제거
-    for j in old.get("jobs", []):
-        url = canonical(j.get("url", ""))
-        category = j.get("category", "")
-
-        if (
-            url
-            and category in QUERIES
-            and relevant(
-                j.get("title", ""),
-                j.get("description", ""),
-                url,
-                category,
-            )
-        ):
-            jobs[url] = j
+    diagnostics = {
+        'queries': 0,
+        'rss_results': 0,
+        'rejected': {},
+        'accepted': 0,
+        'sources': {}
+    }
 
     errors = []
     seen = set()
-    discovered = 0
+    tasks = []
 
-    for cat, queries in QUERIES.items():
-        for q in queries:
-            try:
-                for title, url, desc in search(q):
-                    if not url:
-                        continue
+    # 일반 검색 + 2026년 과거 공고 검색 + 사이트별 검색
+    for cat, terms in CATEGORIES.items():
+        for term in terms:
+            tasks.append((
+                cat,
+                term + ' 채용 2026 대한민국',
+                '전체 웹'
+            ))
 
-                    if not relevant(title, desc, url, cat):
-                        continue
+            tasks.append((
+                cat,
+                term + ' 2026 마감 채용',
+                '과거 공고'
+            ))
 
-                    if url in seen:
-                        continue
+            for name, domain in SITES.items():
+                if term != terms[0] and term != terms[-1]:
+                    continue
 
-                    seen.add(url)
+                tasks.append((
+                    cat,
+                    f'site:{domain} {term} 채용 2026',
+                    name
+                ))
 
-                    prev = jobs.get(url, {})
-                    score, hits = fit(title + " " + desc)
+    for cat, q, source in tasks:
+        diagnostics['queries'] += 1
 
-                    changed = bool(
-                        prev and (
-                            prev.get("title") != title
-                            or prev.get("description") != desc
-                        )
-                    )
+        try:
+            rows = rss(q)
+            diagnostics['rss_results'] += len(rows)
 
-                    jobs[url] = {
-                        **prev,
-                        "url": url,
-                        "title": title[:250],
-                        "description": desc[:700],
-                        "category": prev.get("category", cat),
-                        "sector": sector(title, desc),
-                        "location_check": location_status(title, desc),
-                        "source": urlparse(url).netloc,
-                        "fit": score,
-                        "matched_skills": hits,
-                        "first_seen": prev.get("first_seen", now),
-                        "last_seen": now,
-                        "changed_at": (
-                            now if changed else prev.get("changed_at")
-                        ),
-                        "status": (
-                            "검색 발견 · 국내 근무 및 "
-                            "모집 여부 원문 확인 필요"
-                        ),
-                    }
+            diagnostics['sources'].setdefault(
+                source,
+                {'queries': 0, 'results': 0, 'accepted': 0}
+            )
 
-                    discovered += 1
+            diagnostics['sources'][source]['queries'] += 1
+            diagnostics['sources'][source]['results'] += len(rows)
 
-            except Exception as exc:
-                errors.append(
-                    f"{q}: {type(exc).__name__}: {str(exc)[:140]}"
+            for title, url, desc in rows:
+                ok, reason = accept(
+                    title, desc, url, cat
                 )
 
-            time.sleep(0.4)
+                if not ok:
+                    diagnostics['rejected'][reason] = (
+                        diagnostics['rejected'].get(reason, 0) + 1
+                    )
+                    continue
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    kept = []
+                if url in seen:
+                    continue
 
-    for j in jobs.values():
-        try:
-            last = datetime.fromisoformat(
-                j["last_seen"].replace("Z", "+00:00")
+                seen.add(url)
+                diagnostics['accepted'] += 1
+                diagnostics['sources'][source]['accepted'] += 1
+
+                prev = archive.get(url, {})
+
+                relevant = [
+                    k for k in CORE + FIN
+                    if k in (title + ' ' + desc).lower()
+                ]
+
+                archive[url] = {
+                    **prev,
+                    'url': url,
+                    'title': title[:240],
+                    'description': desc[:700],
+                    'category': cat,
+                    'source': urlparse(url).netloc,
+                    'discovered_via': source,
+                    'fit': (
+                        '상' if len(relevant) >= 3
+                        else '중' if relevant else '하'
+                    ),
+                    'matched_skills': relevant[:12],
+                    'first_seen': prev.get('first_seen', now),
+                    'last_seen': now,
+                    'seen_in_latest_run': True,
+                    'location_check': (
+                        '국내 관련 단서 있음 · 확인 필요'
+                        if any(
+                            k in (title + ' ' + desc).lower()
+                            for k in KOREA
+                        )
+                        else '근무지 미확인'
+                    ),
+                    'posting_date_hint': classify_date(
+                        title, desc
+                    ),
+                    'status': '모집 여부 확인 필요',
+                    'historical': True
+                }
+
+        except Exception as exc:
+            errors.append(
+                f'{source} / {q}: '
+                f'{type(exc).__name__}: {str(exc)[:100]}'
             )
-        except (KeyError, ValueError):
-            continue
 
-        if last >= cutoff:
-            j["seen_in_latest_run"] = j["url"] in seen
-            kept.append(j)
+        time.sleep(0.12)
 
-    kept.sort(
-        key=lambda j: j.get("first_seen", ""),
-        reverse=True,
+    for url, j in archive.items():
+        if url not in seen:
+            j['seen_in_latest_run'] = False
+
+    # 과거 공고 자동 삭제하지 않음
+    jobs = sorted(
+        archive.values(),
+        key=lambda j: j.get('first_seen', ''),
+        reverse=True
     )
 
-    output = {
-        "updated_at": now,
-        "discovered_this_run": discovered,
-        "queries_attempted": sum(
-            map(len, QUERIES.values())
-        ),
-        "errors": errors,
-        "jobs": kept[:1000],
-        "notice": (
-            "한국 근무지와 정유·화학/CCUS/공정안전 경험 "
-            "연관성을 검색한 후보입니다. 금융·컨설팅 포함. "
-            "실제 국내 근무 여부, 모집 중 여부, "
-            "마감일 및 우대조건은 원문 확인이 필요합니다."
-        ),
+    result = {
+        'updated_at': now,
+        'discovered_this_run': diagnostics['accepted'],
+        'queries_attempted': diagnostics['queries'],
+        'errors': errors,
+        'diagnostics': diagnostics,
+        'jobs': jobs,
+        'notice': (
+            '공개 검색 결과 기반 채용 후보 목록. '
+            '2026년 과거 공고 포함. '
+            '마감 여부·근무지·우대사항은 '
+            '원문 검증 전까지 미확인입니다.'
+        )
     }
 
-    DATA.parent.mkdir(parents=True, exist_ok=True)
+    OUT.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    DATA.write_text(
-        json.dumps(output, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    OUT.write_text(
+        json.dumps(
+            result,
+            ensure_ascii=False,
+            indent=2
+        ),
+        encoding='utf-8'
     )
 
     print(
-        f'검색 후보 {discovered}개, '
-        f'보관 {len(output["jobs"])}개, '
-        f'오류 {len(errors)}개'
+        '검색:', diagnostics['queries'],
+        'RSS 결과:', diagnostics['rss_results'],
+        '채택:', diagnostics['accepted'],
+        '오류:', len(errors)
     )
 
-    if errors:
-        print("\n".join(errors))
+    print('제외 이유:', diagnostics['rejected'])
+    print(
+        '출처별:',
+        json.dumps(
+            diagnostics['sources'],
+            ensure_ascii=False
+        )
+    )
+
+    for e in errors[:10]:
+        print('ERROR:', e)
 
 
-if __name__ == "__main__":
-    run()
-
+if __name__ == '__main__':
+    main()
