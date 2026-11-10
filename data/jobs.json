@@ -1,66 +1,66 @@
 {
-  "updated_at": "2026-11-09T23:26:24.927300+00:00",
+  "updated_at": "2026-11-10T23:22:37.806118+00:00",
   "queries_attempted": 96,
   "discovered_this_run": 0,
   "diagnostics": {
     "queries": 96,
-    "rss_results": 940,
-    "unique_urls": 740,
+    "rss_results": 939,
+    "unique_urls": 669,
     "verified": 0,
     "rejected": {
+      "원문 접근 실패": 141,
       "검증 가능한 공고 형식 없음": 519,
-      "원문 접근 실패": 209,
-      "HTML 아님": 12
+      "HTML 아님": 9
     },
     "by_source": {
       "전체": {
         "queries": 16,
-        "rss": 156,
+        "rss": 160,
         "verified": 0
       },
       "과거": {
         "queries": 16,
-        "rss": 159,
+        "rss": 160,
         "verified": 0
       },
       "사람인": {
         "queries": 8,
-        "rss": 70,
+        "rss": 62,
         "verified": 0
       },
       "자소설닷컴": {
         "queries": 8,
-        "rss": 78,
+        "rss": 80,
         "verified": 0
       },
       "LinkedIn": {
         "queries": 8,
-        "rss": 81,
+        "rss": 80,
         "verified": 0
       },
       "리멤버": {
         "queries": 8,
-        "rss": 81,
+        "rss": 80,
         "verified": 0
       },
       "한국벤처캐피탈협회": {
         "queries": 8,
-        "rss": 78,
+        "rss": 80,
         "verified": 0
       },
       "금융투자협회": {
         "queries": 8,
-        "rss": 81,
+        "rss": 78,
         "verified": 0
       },
       "잡코리아": {
         "queries": 8,
-        "rss": 81,
+        "rss": 80,
         "verified": 0
       },
       "원티드": {
         "queries": 8,
-        "rss": 75,
+        "rss": 79,
         "verified": 0
       }
     }
